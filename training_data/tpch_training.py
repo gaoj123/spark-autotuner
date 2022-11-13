@@ -314,10 +314,29 @@ def randomize_params():
             
 
 ### Examples running script
-# 
+# python3 tpch_training.py 1 test_run
                             
 # Example Slurm job
 '''
+#!/bin/bash 
+#SBATCH -n 4 #Request 4 tasks (cores)
+#SBATCH -N 1 #Request 1 node
+#SBATCH -t 0-06:00 #Request runtime of 1 minutes
+#SBATCH -C centos7 #Request only Centos7 nodes
+#SBATCH -p sched_mit_hill #Run on sched_engaging_default partition
+#SBATCH --mem-per-cpu=4000 #Request 4G of memory per CPU
+#SBATCH -o output_%j.txt #redirect output to output_JOBID.txt
+#SBATCH -e error_%j.txt #redirect errors to error_JOBID.txt
+echo $PATH
+echo "hi"
+module add python/3.9.4
+alias python='/usr/bin/python3.9.4'
+python3 – version 
+pip3 install --user numpy
+pip3 install --user pyspark
+
+python3  ../../../../../../../spark-autotuner/training_data/tpch_training.py 1 main_job_n4_mem-per-cpu4000
+
 '''
 
 if __name__ == "__main__":
