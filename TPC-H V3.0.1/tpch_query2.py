@@ -5,6 +5,9 @@ import numpy as np
 import json
 
 from pyspark.sql import SparkSession 
+from pyspark.conf import SparkConf
+
+from pyspark.context import SparkContext
 from pyspark.sql.types import (
     DoubleType, LongType, StringType, StructField, StructType)
 
@@ -98,20 +101,77 @@ SUPPLIER_SCHEMA = StructType([
 
 CURRENT_FILE_PATH = os.path.dirname(__file__)
 
+def run_queries(paramaters):
+
+# Represent possible spark configuration parameters
+'''
+List of dictionaries, where each dictionary represents a single parameter
+{
+'spark_param': True / False -- system parameters are fixed, not something we feed to spark but something we should record
+'name': str
+'cur_value': # initially set to default - this is what we will be changing / generating on each run
+'default_value': num - fixed
+'possible_values': list of possible values
+}
+'''
+parameters = []
+
+
+'''
+'''
+    
+'''
+deterministic approach
+say we want to run n times on every combo two possible values for each paramater
+2 ^ n
+'''
+
+
+#TODO - we will want to add fixed system parameters -- like how much memory we have, number of cores, number of nodes
+# this should probably be a system argument that is fed to the script by the job running it 
+
 if __name__ == "__main__":
     # For now, we expect only a single query to be run at a time for simplicity.
     # Ideally, we should be able to run all queries with a single SparkSession
     # and loading all tables only once.
     try:
-        query_num = sys.argv[1]
+        ncores, nnodes, sys_mem, sf = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
     except:
-        query_num = 1
+        ncores = 2
+        nnodes = 1
+        sys_mem = 2 # GB
+        # ^ this is what the default is for running a jupyter notebook module. We'll want to submit different jobs that have different parameters for cores, nodes and memories and run that on different scale factors of the database
+        sf = 1 # GB, default table scale factor
+        
+    # add fixed system parameters
     
-    spark = SparkSession.builder \
-                    .appName("TPC- H Benchmarking Queries") \
-                    .config("spark.some.config.option", "some-value") \
-                    .getOrCreate()
+    # generate next set of parameters
     
+    
+    # load params
+    CONFIG_FNAME= "./ConfigParams/conf1.conf"
+    with open(CONFIG_FNAME,'r') as file:
+        print(file.readlines())
+    conf = SparkConf(loadDefaults=False)
+    #conf.setExecutorEnv(pairs = [("spark.app.name", "work_plz"), ("spark.executor.memory", "4g")])
+    conf.setAll([('spark.app.name', 'hello'), ('spark.executor.memory', '8g'), ('spark.executor.cores', '3'), ('spark.cores.max', '3'), ('spark.driver.memory','8g')])
+
+    os.environ["SPARK_CONF_DIR"] = CONFIG_FNAME
+    # build spark with paramaters
+    spark  = SparkSession.builder.config(conf=conf).getOrCreate()
+    
+    #SparkSession.builder.config(conf=SparkConf())
+    
+
+
+    configurations = spark.sparkContext.getConf().getAll()
+    print("Configuration")
+    for item in configurations: 
+        print(item)
+    
+    
+    
+    # Make an instance of SparkConf()
     customer = spark.read.csv("./dbgen/customer.tbl", sep = "|", schema=CUSTOMER_SCHEMA)
     customer.createOrReplaceTempView("customer")
 
