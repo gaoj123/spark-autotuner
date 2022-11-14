@@ -132,7 +132,7 @@ def getSystemInfo():
         logging.exception(e)
     return info
 
-def run_queries(parameters, debug=False):
+def run_queries(parameters, n=10, debug=False):
     '''
     Run TPC-H queries 10 times and take the median runtime of each query 
     to generate a single training run for a set of parameters.
@@ -176,12 +176,13 @@ def run_queries(parameters, debug=False):
     # load tables
     tables = {}
     for table_name, table_schema in TABLE_SCHEMA_MAP.items():
-        table = spark.read.csv(f"{CURRENT_FILE_PATH}/{SF_STR}/{table_name}.tbl", sep = "|", schema=table_schema)
+        table = spark.read.csv(f"{CURRENT_FILE_PATH}/{SF_STR}/{table_name}.tbl", sep = "|",
+                               schema=table_schema)
         table.createOrReplaceTempView(table_name)
         tables[table_name] = table
 
-    # take median of 10 runs for each query
-    for j in range(10):
+    # take median of n runs for each query
+    for j in range(n):
         result['runtimes']['total'].append(0)
         for qnum, qtext in TPCH_QUERIES.items(): 
                 # Measure execution time of sql query.
@@ -195,12 +196,12 @@ def run_queries(parameters, debug=False):
             except:
                 if debug:
                     print(f"failed while running query {qnum}...  ")
+    
     # take median of all runtimes as final output
     for key, times in result['runtimes'].items():
         result['runtimes'][key] = np.median(times)
         if debug:
             print(key, result['runtimes'][key])
-    
     # reset spark so we can load new param config next time
     spark.stop()
     #spark.newSession()#_instantiatedContext attribute of the session to None after calling session.stop().
@@ -272,8 +273,8 @@ make_param('spark.memory.storageFraction', True, .5, [x/10 for x in list(range(3
                  22: 
                 'total': float time(s)) }
 '''
-# If a set of parameters led system to crash because they were an impossible combination
-# runtimes value will be None
+# If a set of parameters led system to crash because they were an impossible combination we will log it like 
+# result = {'params':parameters, 'runtimes': {}, 'msg': str(e)}
 
 def deterministic_param_runs(debug=False):
     '''
@@ -286,7 +287,11 @@ def deterministic_param_runs(debug=False):
     '''
     params = SPARK_PARAMETERS + SYSTEM_PARAMETERS
     # run with default params first
-    result = run_queries(params)               
+    result = run_queries(params, 100)
+    if debug:
+        print("default", result['runtimes']['total'])
+        tot = result['runtimes']['total']
+        print(max(tot)-min(tot), np.std(tot), np.median(tot), np.average(tot))
     log_results(result)
     
     for param in params:
@@ -294,14 +299,21 @@ def deterministic_param_runs(debug=False):
             for val in param['possible_values']:
                 if val != param['default_value']:
                     param['cur_value'] = val
-                    result = run_queries(params)               
+                    result = run_queries(params, 100)               
                     log_results(result)
                     if debug:
-                        print(param['name'], val, result['runtimes'].get('total'))
-                        
+                        tot = result['runtimes'].get('total')
+                        if tot:
+                            print(max(tot)-min(tot), np.std(tot), np.median(tot), np.average(tot))
+                        else:
+                            print(param['name'], val, 'FAILED')
+                                
             # reset param back to default
             param['cur_value'] = param['default_value']
-            
+    
+    
+        
+
                     
 def randomize_params():
     new_params = SYSTEM_PARAMETERS[:]
@@ -344,11 +356,10 @@ if __name__ == "__main__":
         sf, job_name = sys.argv[1], sys.argv[2]
     except:
         sf = 1 # GB, default table scale factor
-        job_name = 'local run'
+        job_name = 'local_run'
 
     # add fixed system parameters
     SYSTEM_PARAMETERS = [make_param('sf', False, 1, [1, 10, 60], sf), make_param('job_name', False, 1, [1, 10, 60], job_name)]
-    # platform -- engaging -- hardcoded in case we try other platforms, would be good to know what system we're running
     for param_name, param_val in getSystemInfo().items():
         SYSTEM_PARAMETERS.append(make_param(param_name, False, None, [], param_val))
   
@@ -358,12 +369,13 @@ if __name__ == "__main__":
         with open(f"{CURRENT_FILE_PATH}/queries/{i}.sql") as f:
             TPCH_QUERIES[i] = f.read() 
     
-   
+   # make a unique log file name
     LOG_FNAME = f"{CURRENT_FILE_PATH}/training_results/sf{sf}_{job_name}_deterministic_{time.time()}.json"
     SF_STR = f"sf{sf}"
     print(LOG_FNAME)
-    # check table size
+    
     '''
+    # check table size
     for table in TABLE_SCHEMA_MAP:
         file_size = os.path.getsize(f"{CURRENT_FILE_PATH}/{SF_STR}/{table}.tbl")
         print(str(round(file_size / (1024.0 **2)))+" MB")
@@ -371,8 +383,13 @@ if __name__ == "__main__":
     with open(LOG_FNAME, "wb") as f:
         pass # create empty file? 
     
+    # run random stuff ten times to warm up the system?
+    # this is concerning that the first run is always the longest -- why?
+    for i in range(10):
+        run_queries(randomize_params())
+    
     print("starting deterministic runs")
-    deterministic_param_runs()
+    deterministic_param_runs(False)
     
     LOG_FNAME = f"{CURRENT_FILE_PATH}/training_results/sf{sf}_{job_name}_random_{time.time()}.json"
     print(LOG_FNAME)
@@ -382,5 +399,5 @@ if __name__ == "__main__":
     while True:
         # generate next set of parameters by randomizing every spark parameter
         params = randomize_params()
-        result = run_queries(params)               
+        result = run_queries(params, 100)               
         log_results(result)
