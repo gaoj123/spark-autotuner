@@ -3,6 +3,7 @@ import sys
 import time 
 import numpy as np
 import json
+import gc
 
 from pyspark.sql import SparkSession 
 from pyspark.conf import SparkConf
@@ -118,9 +119,8 @@ TABLE_FILE_PATH = CURRENT_FILE_PATH + "/../TPC-H V3.0.1/dbgen"
 def get_scale_factor():
     # look at table files sizes and add them together
     # return scale factor of all table sizes combined as an int representing GB
-    direc = TABLE_FILE_PATH
-    files = os.listdir(direc)
-    files = [f for f in files if os.path.isfile(direc+'/'+f) and '.tbl' in f] #just files
+    files = os.listdir(TABLE_FILE_PATH)
+    files = [f for f in files if os.path.isfile(f'{TABLE_FILE_PATH}/{f}') and '.tbl' in f]
     table_sizes = [os.path.getsize(f'{TABLE_FILE_PATH}/{f}') for f in files]
     return round(sum(table_sizes)/ (1024.0 **3))
 
@@ -175,6 +175,8 @@ def run_queries(parameters, n=10, find_median_runtime=True):
     except Exception as e:
         if spark:
             spark.stop()
+            del spark
+            gc.collect()
         # this might happen because some parameters are related,
         # and we might have made an impossible parameter assignment
         result = {'params':parameters, 'runtimes': {}, 'msg': str(e)}
@@ -187,13 +189,15 @@ def run_queries(parameters, n=10, find_median_runtime=True):
             assert item[1] == str(parameters[param_name_index.get(item[0])]['cur_value']), f'Spark session param {item} != {parameters[param_name_index.get(item[0])]}'
     
     # load tables
+    start_time = time.time()
     tables = {}
     for table_name, table_schema in TABLE_SCHEMA_MAP.items():
         table = spark.read.csv(f"{TABLE_FILE_PATH}/{table_name}.tbl", sep = "|",
                                schema=table_schema)
         table.createOrReplaceTempView(table_name)
         tables[table_name] = table
-
+    end_time = time.time()
+    result['runtimes']['load_tables'] = [end_time-start_time]
     # take median of n runs for each query
     for j in range(n):
         spark.catalog.clearCache() # clear cache before each run
@@ -215,6 +219,10 @@ def run_queries(parameters, n=10, find_median_runtime=True):
     # reset spark so we can load new param config next time
     spark.catalog.clearCache() # clear cache at the end of each run just in case?
     spark.stop()
+    del spark
+    del tables
+    gc.collect()
+
     return result
     
 def log_results(result_dict, debug=False):
@@ -272,7 +280,7 @@ make_param('spark.task.cpus', True, 1, list(range(1,3))),
 make_param('spark.sql.shuffle.partitions', True, 200, list(range(100,1001, 100))),
 make_param('spark.default.parallelism', True, 200, list(range(20,400, 40))),
 make_param('spark.memory.storageFraction', True, .5, [x/10 for x in list(range(3,9))]), 
-make_param('spark.ui.port', True, 4040, [i for i in range(4040, 4058)]),
+#make_param('spark.ui.port', True, 4040, [i for i in range(4040, 4058)]),
 ]
 
 # Training data stored in json where each entry
