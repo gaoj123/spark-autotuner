@@ -97,17 +97,16 @@ def deterministic_param_runs(find_median_runtime=True):
     '''
     params = SPARK_PARAMETERS
     # run with default params first
-    log_results(params)
-    log_results(params)
-    log_results(params)
-    log_results(params)
+    for i in range(10):
+        log_results(params)
     
     for param in params:
         if param['spark_param']:
             for val in param['possible_values']:
                 if val != param['default_value']:
-                    param['cur_value'] = val            
-                    log_results(params)
+                    param['cur_value'] = val
+                    for i in range(10):
+                        log_results(params)
 
             # reset param back to default
             param['cur_value'] = param['default_value']
@@ -166,21 +165,5 @@ if __name__ == "__main__":
 
     print("starting deterministic list of params")
     deterministic_param_runs()
-    
-    # make a unique log file name for medians
-    LOG_FNAME = f"{CURRENT_FILE_PATH}/training_params/randparams_{num_files+1}.json"
-    print(LOG_FNAME)
-    
-    with open(LOG_FNAME, "wb") as f:
-        pass # create empty file? 
-
-    print("starting deterministic params")
-    deterministic_param_runs()
-    
-    print("moving to randomize params")
-
-    while True:
-        # generate next set of parameters by randomizing every spark parameter
-        params = randomize_params()            
-        log_results(params)
+    print("done")
 
