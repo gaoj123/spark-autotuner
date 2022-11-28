@@ -97,7 +97,7 @@ def deterministic_param_runs(find_median_runtime=True):
     '''
     params = SPARK_PARAMETERS
     # run with default params first
-    for i in range(10):
+    for i in range(50):
         log_results(params)
     
     for param in params:
@@ -105,7 +105,7 @@ def deterministic_param_runs(find_median_runtime=True):
             for val in param['possible_values']:
                 if val != param['default_value']:
                     param['cur_value'] = val
-                    for i in range(10):
+                    for i in range(50):
                         log_results(params)
 
             # reset param back to default
