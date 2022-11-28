@@ -313,8 +313,10 @@ python3  ../../../../../../../spark-autotuner/training_data/tpch_training.py mai
 if __name__ == "__main__":
     try:
         job_name = sys.argv[1]
+        N = int(sys.argv[2])
     except:
-        job_name = 'local_individual_job'
+        job_name = 'local_individual_rand_job'
+        N = 500
     sf = get_scale_factor()
     # add fixed system parameters
     SYSTEM_PARAMETERS = [make_param('sf', False, 1, [1, 10, 60, 300], sf), make_param('job_name', False, 1, [1, 10, 60], job_name)]
@@ -331,7 +333,7 @@ if __name__ == "__main__":
     LOG_FNAME = f"{CURRENT_FILE_PATH}/training_results/sf{sf}_rand_{job_name}.txt"
     SF_STR = f"sf{sf}"
     params = randomize_params()
-    result = run_queries(params)  
+    result = run_queries(params, n=N)  
     log_results(result)
     print("done", result['runtimes'])
 
