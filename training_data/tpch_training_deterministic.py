@@ -117,6 +117,7 @@ TABLE_SCHEMA_MAP = {
 CURRENT_FILE_PATH = os.path.dirname(__file__)
 TABLE_FILE_PATH = CURRENT_FILE_PATH + "/../TPC-H V3.0.1/dbgen"
 DET_PARAMS_FNAME = CURRENT_FILE_PATH + "/training_params/detparams_9.json"
+# currently forces each of the 88 different deterministic parameter sets to run for 10 times so we get a better range of data
 DET_PARAMS = None
 with open(DET_PARAMS_FNAME, 'rb') as f:
     DET_PARAMS = json.load(f)
@@ -150,16 +151,15 @@ def getSystemInfo():
 
 def run_queries(parameters, n=500):
     '''
-    Run TPC-H queries 10 times and take the median runtime of each query 
+    Run TPC-H queries n times and take the sum of all query runtimes 
     to generate a single training run for a set of parameters.
     
     Input: 
     parameters: list of parameter dictionaries 
     n: int number of times to run queries
-    find_median_runtime: if True returns runtimes values as a float (median), otherwise as a list of all n runtimes 
-    
+
     Returns: 
-    training_data dictionary with params and results 
+    training_data dictionary with params and runtime results 
     '''
     result = {'params': parameters, 'runtimes': {}}
     spark = None
@@ -206,7 +206,8 @@ def run_queries(parameters, n=500):
         tables[table_name] = table
     end_time = time.time()
     result['runtimes']['load_tables'] = end_time-start_time
-
+    
+    # run queries n times
     start_time = time.time()
     for j in range(n):
         for qnum, qtext in TPCH_QUERIES.items(): 
@@ -217,14 +218,12 @@ def run_queries(parameters, n=500):
     return result
     
 def log_results(result_dict, debug=False):
-    # store query run results in a json file
-    # TODO -- there has to be a more efficient way of logging than this...
+    # log results to a text file by appending a new line containing result dictionary in string form
     with open(LOG_FNAME,'a') as file:
         file.write(str(result_dict)+"\n")
 
 def num_log():
-    # store query run results in a json file
-    # TODO -- there has to be a more efficient way of logging than this...
+    # return the number of lines currently in the log file (used to determine what set of parameters the script should run)
     try:
         with open(LOG_FNAME,'r') as file:
             # First we load existing data into a dict.
@@ -275,37 +274,31 @@ make_param('spark.memory.storageFraction', True, .5, [x/10 for x in list(range(3
 #make_param('spark.ui.port', True, 4040, [i for i in range(4040, 4058)]),
 ]
 
-# Training data stored in json where each entry
+# Training data stored in log where each entry
 '''
 {   'params': [ list of param dictionaries as described above], 
-    'runtimes': {1: float time (seconds), median runtime of query1
-                ....
-                 22: 
-                'total': float time(s)) }
+    'runtimes': {'build_config': float time(s) representing time to make spark session and set params
+                 'load_table': float time (s) representing time to load tables into spark session
+                'total': float time(s) it takes to run queries n times }
+                
+Note runtimes should not be stored in a list-- the first runtime for a query set will be slow, subsequent ones use caching to speed things up
+The only reason we have n > 1 is to increase the total runtime in an effort to hopefully reduce noise
+
+For similar reasons we only use a single parameter set per script run
 '''
 # If a set of parameters led system to crash because they were an impossible combination we will log it like 
 # result = {'params':parameters, 'runtimes': {}, 'msg': str(e)}
-
-                    
-def randomize_params():
-    new_params = SYSTEM_PARAMETERS[:]
-    for param in SPARK_PARAMETERS:
-        param = param.copy() # don't mutate spark params
-        val_index = np.random.randint(0, len(param['possible_values']))
-        param['cur_value'] = param['possible_values'][val_index]
-        new_params.append(param)
-    return new_params
             
 
 ### Examples running script
-# python3 tpch_training.py test_run
+# python3 tpch_training_deterministic.py test_run_det 5
                             
 # Example Slurm job
 '''
 #!/bin/bash 
-#SBATCH -n 4 #Request 4 tasks (cores)
-#SBATCH -N 1 #Request 1 node
-#SBATCH -t 0-06:00 #Request runtime of 1 minutes
+#SBATCH -n 16 #Request 16 tasks (cores)
+#SBATCH -N 4 #Request 4 nodes
+#SBATCH -t 0-18:00 #Request runtime of 18 hours
 #SBATCH -C centos7 #Request only Centos7 nodes
 #SBATCH -p sched_mit_hill #Run on sched_engaging_default partition
 #SBATCH --mem-per-cpu=4000 #Request 4G of memory per CPU
@@ -318,8 +311,10 @@ alias python='/usr/bin/python3.9.4'
 python3 – version 
 pip3 install --user numpy
 pip3 install --user pyspark
+pip3 install --user psutil
 
-python3  ../../../../../../../spark-autotuner/training_data/tpch_training.py main_job_n4_mem-per-cpu4000
+python3  ../../../../../../../../../nobackup1/hoped/spark-autotuner/training_data/tpch_training_deterministic.py main_det_10 250
+   ^ repeat this line for ~ 1000 times to get the 880 executions of this script stored in the main_det_10 file
 
 '''
 
@@ -343,7 +338,7 @@ if __name__ == "__main__":
             TPCH_QUERIES[i] = f.read() 
     
     # make a unique log file name - list of all runtimes for sensitivity analysis
-    LOG_FNAME = f"{CURRENT_FILE_PATH}/training_results/sf{sf}_det_{job_name}.txt"
+    LOG_FNAME = f"{CURRENT_FILE_PATH}/training_results/sf{sf}_n{N}_det_{job_name}.txt"
     SF_STR = f"sf{sf}"
     print(LOG_FNAME)
 
