@@ -1,18 +1,6 @@
 import os 
-import sys 
-import time 
-import numpy as np
 import json
-import gc
-
-from pyspark.sql import SparkSession 
-from pyspark.conf import SparkConf
-
-from pyspark.context import SparkContext
-from pyspark.sql.types import (
-    DoubleType, LongType, StringType, StructField, StructType)
-
-import platform,socket,re,uuid,json,psutil,logging
+import sys
 
 CURRENT_FILE_PATH = os.path.dirname(__file__)
 def log_results(result_dict, debug=False):
@@ -69,11 +57,16 @@ make_param('spark.rpc.message.maxSize', True, '128', [f"{x}" for x in list(range
 make_param('spark.rdd.compress', True, 'false', ['true', 'false']),
 make_param('spark.io.compression.codec', True, 'lz4', ['lz4', 'snappy']),
 make_param('spark.task.cpus', True, 1, list(range(1,3))),
-make_param('spark.sql.shuffle.partitions', True, 200, list(range(100,1001, 100))),
+make_param('spark.sql.shuffle.partitions', True, 100, list(range(50, 141, 10))), 
 make_param('spark.default.parallelism', True, 200, list(range(20,400, 40))),
 make_param('spark.memory.storageFraction', True, .5, [x/10 for x in list(range(3,9))]), 
-#make_param('spark.ui.port', True, 4040, [i for i in range(4040, 4058)]),
 ]
+'''
+Note:
+forcing spark shuffle.partitions to be low (normally default is 200, range from 100-1000 in increments of 100)
+because otherwise we get a too many open files error 
+ulimit -a is 1024 and we cannot set ulimit -n to be higher  on engaging platform :/
+'''
 
 # Training data stored in json where each entry
 '''
@@ -85,7 +78,6 @@ make_param('spark.memory.storageFraction', True, .5, [x/10 for x in list(range(3
 '''
 # If a set of parameters led system to crash because they were an impossible combination we will log it like 
 # result = {'params':parameters, 'runtimes': {}, 'msg': str(e)}
-
 def deterministic_param_runs(find_median_runtime=True):
     '''
     deterministic approach:
@@ -97,19 +89,19 @@ def deterministic_param_runs(find_median_runtime=True):
     '''
     params = SPARK_PARAMETERS
     # run with default params first
-    for i in range(50):
+    for i in range(N):
         log_results(params)
     
-    for param in params:
-        if param['spark_param']:
-            for val in param['possible_values']:
-                if val != param['default_value']:
-                    param['cur_value'] = val
-                    for i in range(50):
+        for param in params:
+            if param['spark_param']:
+                for val in param['possible_values']:
+                    if val != param['default_value']:
+                        param['cur_value'] = val
                         log_results(params)
 
-            # reset param back to default
-            param['cur_value'] = param['default_value']
+                # reset param back to default
+                param['cur_value'] = param['default_value']
+        print(f"done logging {i=}")
     
 
                     
@@ -124,46 +116,22 @@ def randomize_params():
             
 
 ### Examples running script
-# python3 tpch_training.py test_run
-                            
-# Example Slurm job
-'''
-#!/bin/bash 
-#SBATCH -n 4 #Request 4 tasks (cores)
-#SBATCH -N 1 #Request 1 node
-#SBATCH -t 0-06:00 #Request runtime of 1 minutes
-#SBATCH -C centos7 #Request only Centos7 nodes
-#SBATCH -p sched_mit_hill #Run on sched_engaging_default partition
-#SBATCH --mem-per-cpu=4000 #Request 4G of memory per CPU
-#SBATCH -o output_%j.txt #redirect output to output_JOBID.txt
-#SBATCH -e error_%j.txt #redirect errors to error_JOBID.txt
-echo $PATH
-echo "hi"
-module add python/3.9.4
-alias python='/usr/bin/python3.9.4'
-python3 – version 
-pip3 install --user numpy
-pip3 install --user pyspark
-
-python3  ../../../../../../../spark-autotuner/training_data/tpch_training.py main_job_n4_mem-per-cpu4000
-
-'''
+# python3 tpch_param.py 10
 
 if __name__ == "__main__":
+    try:
+        N = int(sys.argv[1])
+    except Exception as e:
+        print(e)
+        N = 10
 
-    # get number of files 
-    direc = f"{CURRENT_FILE_PATH}/training_params/"
-    files = os.listdir(direc)
-    files = [f for f in files if os.path.isfile(direc+'/'+f)] #just files
-    num_files = len(files)
-    
     # make a unique log file name - list of all runtimes for sensitivity analysis
-    LOG_FNAME = f"{CURRENT_FILE_PATH}/training_params/detparams_{num_files+1}.json"
+    LOG_FNAME = f"{CURRENT_FILE_PATH}/training_params/detparams_n{N}.json"
     
     with open(LOG_FNAME, "wb") as f:
         pass # create empty file? 
 
-    print("starting deterministic list of params")
+    print(f"starting deterministic list of params {N=}")
     deterministic_param_runs()
-    print("done")
+    print(f" {LOG_FNAME=} done")
 

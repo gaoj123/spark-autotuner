@@ -1,0 +1,213 @@
+'''
+Convert .tbl files into parquet format
+
+Table schemas made by Min Thet
+
+Conversion script made by hoped
+'''
+
+import os 
+import sys 
+import time 
+import numpy as np
+import json
+import gc
+
+from pyspark.sql import SparkSession 
+from pyspark.conf import SparkConf
+
+from pyspark.context import SparkContext
+from pyspark.sql.types import (
+    DoubleType, LongType, StringType, StructField, StructType)
+
+import platform,socket,re,uuid,json,psutil,logging
+
+
+# Schemas for all table types here. These should be in separate scripts when
+# refactoring code.
+CUSTOMER_SCHEMA = StructType([
+    StructField("c_custkey", LongType()),
+    StructField("c_name", StringType()),
+    StructField("c_address", StringType()),
+    StructField("c_nationkey", LongType()),
+    StructField("c_phone", StringType()),
+    StructField("c_acctbal", DoubleType()),
+    StructField("c_mktsegment", StringType()),
+    StructField("c_comment", StringType()),
+])
+
+LINEITEM_SCHEMA = StructType([
+    StructField("l_orderkey", LongType()),  
+    StructField("l_partkey", LongType()),
+    StructField("l_suppkey", LongType()),
+    StructField("l_linenumber", LongType()),
+    StructField("l_quantity", DoubleType()),
+    StructField("l_extendedprice", DoubleType()),
+    StructField("l_discount", DoubleType()),
+    StructField("l_tax", DoubleType()),
+    StructField("l_returnflag", StringType()),
+    StructField("l_linestatus", StringType()),
+    StructField("l_shipdate", StringType()),
+    StructField("l_commitdate", StringType()),
+    StructField("l_receiptdate", StringType()),
+    StructField("l_shipinstruct", StringType()),
+    StructField("l_shipmode", StringType()),
+    StructField("l_comment", StringType())
+])
+
+NATION_SCHEMA = StructType([
+    StructField("n_nationkey", LongType()), 
+    StructField("n_name", StringType()),
+    StructField("n_regionkey", LongType()),
+    StructField("n_comment", StringType()),
+])
+
+ORDER_SCHEMA = StructType([
+    StructField("o_orderkey", LongType()),
+    StructField("o_custkey", LongType()),
+    StructField("o_orderstatus", StringType()),
+    StructField("o_totalprice", DoubleType()),
+    StructField("o_orderdate", StringType()),
+    StructField("o_orderpriority", StringType()),
+    StructField("o_clerk", StringType()),
+    StructField("o_shippriority", LongType()),
+    StructField("o_comment", StringType())
+])
+
+PART_SCHEMA = StructType([
+    StructField("p_partkey", LongType()),    
+    StructField("p_name", StringType()),
+    StructField("p_mfgr", StringType()),
+    StructField("p_brand", StringType()),
+    StructField("p_type", StringType()),
+    StructField("p_size", LongType()),
+    StructField("p_container", StringType()),
+    StructField("p_retailprice", DoubleType()),
+    StructField("p_comment", StringType()),
+])
+
+PARTSUPP_SCHEMA = StructType([
+    StructField("ps_partkey", LongType()),
+    StructField("ps_suppkey", LongType()),
+    StructField("ps_availqty", LongType()),
+    StructField("ps_supplycost", DoubleType()),
+    StructField("ps_comment", StringType())
+])
+
+REGION_SCHEMA = StructType([
+    StructField("r_regionkey", LongType()),   
+    StructField("r_name", StringType()),
+    StructField("r_comment", StringType()),  
+])
+
+SUPPLIER_SCHEMA = StructType([
+    StructField("s_suppkey", LongType()),    
+    StructField("s_name", StringType()),
+    StructField("s_address", StringType()),
+    StructField("s_nationkey", LongType()),
+    StructField("s_phone", StringType()),
+    StructField("s_acctbal", DoubleType()),
+    StructField("s_comment", StringType())
+])
+
+TABLE_DIMENSION_MAP = {
+    10: {
+        "customer": (1500000, 8),
+        "lineitem": (59986052, 16),
+        "nation": (25, 4),
+        "region": (5, 3),
+        "orders": (15000000, 9),
+        "part": (2000000, 9),
+        "partsupp": (8000000, 5),
+        "supplier": (100000, 7),
+    },
+    
+    300: {
+        "customer": (45000000, 8),
+        "lineitem": (1799989091, 16),
+        "nation": (25, 4),
+        "region": (5, 3),
+        "orders": (450000000, 9),
+        "part": (60000000, 9),
+        "partsupp": (240000000, 5),
+        "supplier": (3000000, 7),
+    },
+    1: {'customer': (150000, 8), 
+        'lineitem': (6001215, 16), 
+        'nation': (25, 4), 
+        'region': (5, 3), 
+        'orders': (1500000, 9), 
+        'part': (200000, 9), 
+        'partsupp': (800000, 5), 
+        'supplier': (10000, 7)}
+}
+
+TABLE_SCHEMA_MAP = {
+        "customer": CUSTOMER_SCHEMA,
+        "lineitem": LINEITEM_SCHEMA,
+        "nation": NATION_SCHEMA,
+        "region": REGION_SCHEMA,
+        "orders": ORDER_SCHEMA,
+        "part": PART_SCHEMA,
+        "partsupp": PARTSUPP_SCHEMA,
+        "supplier": SUPPLIER_SCHEMA,
+}
+
+
+
+'''
+First, make TPC-H tables by going into the dbgen directory and running 
+./dbgen -s 1 
+(replace 1 with whatever scale factor, we've been using 1, 10, 100, 300)
+
+Then run this script, providing the folder where the .tbl files generated by the dbgen scripts are stored.
+
+This script will convert the tables into a parquet file format which should store the schema and compress the tables, making the load / read time faster hopefully. New parquet files will be stored in same file folder.
+
+Example run:
+
+python3 convert_tables.py '/home/hoped/spark-autotuner/tpch_tables/s1' 1
+
+'''
+
+if __name__ == "__main__":
+    try:
+        TABLE_FOLDER = sys.argv[1]
+        sf = int(sys.argv[2])
+    except:
+        TABLE_FOLDER = '/home/hoped/spark-autotuner/tpch_tables/s1'
+        sf = 1
+
+    print(f"{TABLE_FOLDER=}")
+    print(f"{sf=}")
+    find_dims = sf not in TABLE_DIMENSION_MAP
+    print(f"{find_dims=}")
+        
+    spark  = SparkSession.builder.getOrCreate()
+    for table_name, table_schema in TABLE_SCHEMA_MAP.items():
+        print(f"making {table_name}.parquet ...")
+        table = spark.read.csv(f"{TABLE_FOLDER}/{table_name}.tbl", sep = "|",
+                               schema=table_schema)
+        if find_dims:
+            print(f"find dims {table_name}")
+            trows, tcols = table.count(), len(table.columns)
+            print(f'rows {trows} cols {tcols}')
+            TABLE_DIMENSION_MAP.setdefault(sf, {})[table_name] = (trows, tcols)
+        try:
+            table.write.parquet(f"{TABLE_FOLDER}/{table_name}.parquet")
+        except:
+            print(f"{table_name}.parquet already exists?")
+        
+    if find_dims:
+        print(TABLE_DIMENSION_MAP)
+    
+    print("verify table size yeah")
+    # after tables have been written, reload them and check that table dimensions are as expected, yeah?
+    for table_name in TABLE_SCHEMA_MAP:
+        print(f"verifying {table_name}.parquet ...")
+        table = spark.read.parquet(f"{TABLE_FOLDER}/{table_name}.parquet")
+        trows, tcols = table.count(), len(table.columns)
+        exp_rows, exp_cols = TABLE_DIMENSION_MAP[sf][table_name]
+        assert trows == exp_rows, f"sf {sf} table {table_name} got {trows} rows but expected {exp_rows}"
+        assert tcols == exp_cols, f"sf {sf} table {table_name} got {tcols} cols but expected {exp_cols}"
+    
