@@ -161,7 +161,8 @@ class Model:
         print(f"Overall best set: {best_set}, time: {best_time}")
         plt.show()
 
-m = Model()
-m.build_model()
-m.bayesian_optimization()
+if __name__ == "__main__":
+    m = Model()
+    m.build_model()
+    m.bayesian_optimization()
 
