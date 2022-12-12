@@ -1,3 +1,10 @@
+'''
+deterministically vary spark parameters one at a time to all possible values,
+store possible values in a json file that will be read by the deterministic script
+
+@ hoped
+'''
+
 import os 
 import json
 import sys
@@ -102,19 +109,29 @@ def deterministic_param_runs(find_median_runtime=True):
                 # reset param back to default
                 param['cur_value'] = param['default_value']
         print(f"done logging {i=}")
+
+
+def comparison_param_runs(param_lists):
+    for i in range(N): 
+        log_results(SPARK_PARAMETERS) # spark defaults
+        for pl in param_lists:
+            log_results(pl)
+
+
+def make_param_list(param_vals):
+    '''
+    given dictionary of param name -> chosen value,
+    make a list of spark parameter dictionaries with those values
+    without mutating original spark parameters
+    '''
+    params = []
+    for p in SPARK_PARAMETERS:
+        p = p.copy()
+        p['cur_value'] = param_vals[p['name']]
+        params.append(p)
+    return params
     
-
-                    
-def randomize_params():
-    new_params = []
-    for param in SPARK_PARAMETERS:
-        param = param.copy() # don't mutate spark params
-        val_index = np.random.randint(0, len(param['possible_values']))
-        param['cur_value'] = param['possible_values'][val_index]
-        new_params.append(param)
-    return new_params
-            
-
+    
 ### Examples running script
 # python3 tpch_param.py 10
 
@@ -126,6 +143,7 @@ if __name__ == "__main__":
         N = 10
 
     # make a unique log file name - list of all runtimes for sensitivity analysis
+    '''
     LOG_FNAME = f"{CURRENT_FILE_PATH}/training_params/detparams_n{N}.json"
     
     with open(LOG_FNAME, "wb") as f:
@@ -134,4 +152,44 @@ if __name__ == "__main__":
     print(f"starting deterministic list of params {N=}")
     deterministic_param_runs()
     print(f" {LOG_FNAME=} done")
+    '''
+    
+    
+    # make a unique log file name - comparing model / handtuning params against defaults
+    LOG_FNAME = f"{CURRENT_FILE_PATH}/training_params/compareparams_n{N}.json"
+    
+    with open(LOG_FNAME, "wb") as f:
+        pass # create empty file? 
 
+    print(f"starting comparing list of params {N=}")
+    
+    # parameters and values chosen as a result of hand tuning
+    hand_tuning = {
+    'spark.broadcast.blockSize':  '14m',
+    'spark.broadcast.compress':  'false',
+    'spark.default.parallelism':  '20',
+    'spark.driver.cores':  '3',
+    'spark.driver.memory':  '4g',
+    'spark.executor.cores':  '8',
+    'spark.executor.instances':  '8',
+    'spark.executor.memory':  '4g',
+    'spark.io.compression.codec':  'snappy',
+    'spark.memory.fraction':  '0.8',
+    'spark.memory.storageFraction':  '0.7',
+    'spark.rdd.compress':  'true', 
+    'spark.reducer.maxSizeInFlight':  '80m',
+    'spark.rpc.message.maxSize': '192',
+    'spark.shuffle.compress':  'false',
+    'spark.shuffle.file.buffer':  '48k',
+    'spark.shuffle.spill.compress':  'false', 
+    'spark.sql.shuffle.partitions':  '50',
+    'spark.task.cpus':  '1',  
+    }
+    param_lists = [hand_tuning]
+    param_lists = [make_param_list(pl) for pl in param_lists]
+    comparison_param_runs(param_lists)
+    print(f" {LOG_FNAME=} done")
+    
+    
+
+    

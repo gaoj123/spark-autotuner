@@ -186,8 +186,7 @@ if __name__ == "__main__":
     spark  = SparkSession.builder.getOrCreate()
     for table_name, table_schema in TABLE_SCHEMA_MAP.items():
         print(f"making {table_name}.parquet ...")
-        table = spark.read.csv(f"{TABLE_FOLDER}/{table_name}.tbl", sep = "|",
-                               schema=table_schema)
+        table = spark.read.csv(f"{TABLE_FOLDER}/{table_name}.tbl", sep = "|", schema=table_schema)
         if find_dims:
             print(f"find dims {table_name}")
             trows, tcols = table.count(), len(table.columns)
