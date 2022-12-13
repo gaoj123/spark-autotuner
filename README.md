@@ -2,9 +2,6 @@
 
 Hope Dargan, Jenny Gao, Gabriel Jimenez, Min Thet Khine
 
-## Random Forest and Bayesian Optimization
-Running the command "python3 sensitivity_analysis/random_forest.py" will train the random forest model using the data we have (stored in a JSON file).  After training, it will output the feature importance (Gini importance).  The random forest model is also used as a cost estimator for the Bayesian optimization search, which seeks to find the set of parameters with the lowest query time.  This code will run Bayesian optimization five times, each with 100 iterations and 30 initial points.
-
 ## TPC-H for Generating Training Data
 
 ### Generating TPC-H Tables
@@ -30,3 +27,6 @@ The above command should produce TPC-H tables in `TPC-H V3.0.1/dbgen` in `.tbl` 
 ### Generating TPC-H Queries
 
 The `TPC-H V3.0.1/dbgen` folder contains all the necessary TPC-H queries in `TPC-H V3.0.1/dbgen/queries`. Note that the starting queries that are downloaded are just templates and do not have exact values. We substituted the placeholders with the recommended benchmarking values as mentioned in the TPC-H specification. We also converted query 15 to use a Common Table Expression (CTE) since PySpark expects a single SQL statement.
+
+## Random Forest and Bayesian Optimization
+Running the command "python3 sensitivity_analysis/random_forest.py" will train the random forest model using the data we have (stored in a JSON file).  After training, it will output the feature importance (Gini importance).  The random forest model is also used as a cost estimator for the Bayesian optimization search, which seeks to find the set of parameters with the lowest query time.  This code will run Bayesian optimization five times, each with 100 iterations and 30 initial points.
