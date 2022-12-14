@@ -34,10 +34,10 @@ if __name__ == "__main__":
     except:
         job_name = 'alocal_test'
         sf = 1
-    N = 20
+    N = 10
     print(f"{CURRENT_FILE_PATH=}")
     TABLE_FILE_PATH = f"{CURRENT_FILE_PATH}/../tpch_tables/s{sf}"
-    DET_PARAMS_FNAME = f"{CURRENT_FILE_PATH}/training_params/compareparams_n{N}.json"
+    DET_PARAMS_FNAME = f"{CURRENT_FILE_PATH}/training_params/final_compare_params_n{N}.json"
     DET_PARAMS = None
     with open(DET_PARAMS_FNAME, 'rb') as f:
         DET_PARAMS = json.load(f)
