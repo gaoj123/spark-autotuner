@@ -278,7 +278,7 @@ if __name__ == "__main__":
         N = 10
 
     # make a unique log file name - list of all runtimes for sensitivity analysis
-    '''
+
     LOG_FNAME = f"{CURRENT_FILE_PATH}/training_params/detparams_n{N}.json"
     
     with open(LOG_FNAME, "wb") as f:
@@ -287,8 +287,8 @@ if __name__ == "__main__":
     print(f"starting deterministic list of params {N=}")
     deterministic_param_runs()
     print(f" {LOG_FNAME=} done")
-    '''
     
+    '''
     
     # make a unique log file name - comparing model / handtuning params against defaults
     LOG_FNAME = f"{CURRENT_FILE_PATH}/training_params/final_compare_params_n{N}.json"
@@ -302,7 +302,7 @@ if __name__ == "__main__":
     comparison_param_runs(param_lists)
     print("# Param sets to compare", (len(param_lists)) )
     print(f" {LOG_FNAME=} done")
-    
+    '''
     
 
     
