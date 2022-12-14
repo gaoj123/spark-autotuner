@@ -31,6 +31,7 @@ The `TPC-H V3.0.1/dbgen` folder contains all the necessary TPC-H queries in `TPC
 ## Collecting Training Data
 
 * convert_tables.py
+
 The training_data has all files needed to generate and analyze training data.
 After generating the TPC-H tables and queries first convert the .tbl files to parquet files. 
 `$ python3 convert_tables.py '/PATH/TO/spark-autotuner/tpch_tables/s1' 1`
