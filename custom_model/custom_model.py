@@ -230,7 +230,6 @@ def perform_action_big(current_val_index, action_offset, param_index, param_vali
     action-0: attempt to seek backwards one step over valid param value range,
     action-1: attempt to seek forwards one step over valid param value range,
   """
-  # TODO: Expand on parameter actions by using param_index to expose valid parameter ranges for iteration
   valid_actions = (0, 1)
   # Validations
   if action_offset not in valid_actions:
@@ -300,7 +299,6 @@ def generate_tuning_transition_matrix(parameter_count, state_count, param_valid_
   # Action 0: Iterate backwards (-1)
   # Action 1: Iterate forwards (+1)
   transition_matrix = [[] for _ in range(parameter_count*2)]
-  # TODO: print transition matrix
   for param_index in range(parameter_count):
     param_offset = param_index*2
 
@@ -328,7 +326,6 @@ def vector_join(arr1, arr2):
   """
   every element of arr1 combined with every element of arr2
   """
-  # TODO: Expand on this to support more than just 1d arrays of numerical values
   output = []
   for i in arr1:
     for j in arr2:
@@ -341,7 +338,6 @@ def vector_append(matrix1, arr2):
   """
   every element of arr2 combined with every element of matrix1
   """
-  # TODO: Expand on this to support more than just 1d arrays of numerical values
   output = []
   for i in matrix1:
     for j in arr2:
@@ -480,9 +476,8 @@ def pruned_train(state_count, parameter_count, utility_matrix, reward_matrix, ga
     delta_history.append(delta)
     if delta < tol:
       break
-    # TODO: remove test code
-    if epoch >= 2:
-      logging.info("epoch 8 break out.")  # %
+    if epoch >= 8:
+      logging.info("Epoch 8 break out.")  # %
       break
 
   logging.info(f'# iterations of policy improvement: {len(delta_history)}')
@@ -502,7 +497,6 @@ def uncertain_train(state_count, parameter_count, utility_matrix, reward_matrix,
     delta_history.append(delta)
     if delta < tol:
       break
-    # TODO: remove test code
     if epoch > 25:
       break
 
@@ -671,7 +665,6 @@ def generate_gradient_extrapolated_states(reward_matrix, param_valid_values_map,
       # NOTE: Calculate impact of param delta on execute time
       exec_factor = float(cur_exec_time) / near_exec_time
       if not exec_factor < 1.0:
-        # TODO: Decide if we should still add "bad" gradients
         continue
       near_params = np.array(state_values_helper(index, param_index_base_map, param_value_index_map))
       gradient_vector = cur_params - near_params
