@@ -30,3 +30,15 @@ The `TPC-H V3.0.1/dbgen` folder contains all the necessary TPC-H queries in `TPC
 
 ## Random Forest and Bayesian Optimization
 Running the command "python3 sensitivity_analysis/random_forest.py" will train the random forest model using the data we have (stored in a JSON file).  After training, it will output the feature importance (Gini importance).  The random forest model is also used as a cost estimator for the Bayesian optimization search, which seeks to find the set of parameters with the lowest query time.  This code will run Bayesian optimization five times, each with 100 iterations and 30 initial points.
+
+## Customized MDP Model
+The python project for the customized MDP model is contained in the `custom_model` directory.
+To run the model against our training data execute:
+```
+# NOTE: Assumption that python3 points to python 3 interpreter
+# NOTE: Dependency on 'numpy' python package 
+python3 ./custom_model/custom_model.py
+```
+The model will run against the data stored in the JSON file `/custom_model/sf10_training_data_long.json`, tuning for the parameters specified in `/custom_model/params_sf10.json`.
+
+Logs will be contained in the `/custom_model/logs` directory. After processing and training, should observe a print-out of the candidate parameter combinations for low execution times.
