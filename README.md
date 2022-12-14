@@ -37,6 +37,7 @@ After generating the TPC-H tables and queries first convert the .tbl files to pa
 Extra args are output destination and table scale factor. Note this output folder is the assumed TPC-H table location in the other scripts that run the queries and log the runtimes.
 
 * tpch_param.py
+
 To collect data deterministically, you will need to first generate .json files with the parameter combinations. 
 To generate a json files that iterates through all possible parameter values N times, run
 `$ python3 tpch_param.py 10` 
@@ -45,6 +46,7 @@ extra argument is N.
 This file was also used for generating parameter combinations to run the final comparisons (as evidenced by the get_param_lists function and commented out code at the bottom.) You can also set the parameters and possible values you want to explore by modifying the SPARK_PARAMETERS list in tpch_param.py.
 
 * tpch_det.py
+
 To actually collect deterministic data, run 
 `$ python3 tpch_det.py test 1 10 ` 
 Note the additional args are job name, table scale factor, and number of runs for each parameter. This can easily be changed by updating the `if __name__ == '__main__'` section of each python script.
@@ -58,6 +60,7 @@ Note extra args are job name and table scale factor.
 
 
 * tpch_rand.py
+
 This generates a random parameter set, runs the TPC-H queries it, and adds the resulting runtime to the file indicated by the jobname and scale factor.
 
 `$ python3 tpch_rand.py test 1`
@@ -65,6 +68,7 @@ Additional args are job name and scale factor.
 
 
 * training_analysis.ipynb
+
 The training_analysis.ipynb file is a hodge podge of small scripts that do a variety of things. The function of each cell is described, but this file is what we used to generate training data statistics, compile parallel training data files into a single json that can be fed to the models, make the pretty graphs, etc.
 
 The old_scripts and old_training_results folders are historical artifacts which preserve old code and training results in all their original broken glory.  
